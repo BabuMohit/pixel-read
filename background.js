@@ -113,10 +113,68 @@ async function captureFullPage(tabId) {
       htmlContent = null;
     }
 
+    let spatialMap = [];
+    let devicePixelRatio = 1;
+    try {
+      const spatialScript = `
+        (function() {
+          const map = [];
+          const walker = document.createTreeWalker(
+            document.body,
+            NodeFilter.SHOW_TEXT,
+            {
+              acceptNode: function(node) {
+                const text = node.textContent.trim();
+                if (!text) return NodeFilter.FILTER_REJECT;
+                const parent = node.parentElement;
+                if (!parent) return NodeFilter.FILTER_REJECT;
+                const tag = parent.tagName ? parent.tagName.toUpperCase() : '';
+                if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT') return NodeFilter.FILTER_REJECT;
+                const style = window.getComputedStyle(parent);
+                if (style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity) === 0) {
+                  return NodeFilter.FILTER_REJECT;
+                }
+                return NodeFilter.FILTER_ACCEPT;
+              }
+            }
+          );
+          let node;
+          while ((node = walker.nextNode())) {
+            const text = node.textContent.trim();
+            if (!text) continue;
+            const parent = node.parentElement;
+            const rect = parent.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) continue;
+            map.push({
+              text: text,
+              x: Math.round(rect.left + window.scrollX),
+              y: Math.round(rect.top + window.scrollY),
+              width: Math.round(rect.width),
+              height: Math.round(rect.height)
+            });
+          }
+          return JSON.stringify({ spatialMap: map, devicePixelRatio: window.devicePixelRatio });
+        })();
+      `;
+      const spatialResult = await sendDebugCommand(tabId, 'Runtime.evaluate', {
+        expression: spatialScript,
+        returnByValue: true
+      });
+      if (spatialResult && spatialResult.result && spatialResult.result.value) {
+        const parsed = JSON.parse(spatialResult.result.value);
+        spatialMap = parsed.spatialMap || [];
+        devicePixelRatio = parsed.devicePixelRatio || 1;
+      }
+    } catch (e) {
+      spatialMap = [];
+    }
+
     return {
       screenshot: screenshotResult.data,
       html: htmlContent,
-      dimensions: { width, height }
+      dimensions: { width, height },
+      spatialMap,
+      devicePixelRatio
     };
   } finally {
     if (attached) {

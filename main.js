@@ -1,20 +1,33 @@
 (() => {
-  const urlInput = document.getElementById('urlInput');
-  const captureBtn = document.getElementById('captureBtn');
-  const findCaptureBtn = document.getElementById('findCaptureBtn');
-  const viewHtmlBtn = document.getElementById('viewHtmlBtn');
-  const previewImage = document.getElementById('previewImage');
+  const urlInput        = document.getElementById('urlInput');
+  const captureBtn      = document.getElementById('captureBtn');
+  const findCaptureBtn  = document.getElementById('findCaptureBtn');
+  const viewHtmlBtn     = document.getElementById('viewHtmlBtn');
+  const previewImage    = document.getElementById('previewImage');
+  const previewContainer = document.getElementById('previewContainer');
   const previewPlaceholder = document.getElementById('previewPlaceholder');
-  const previewDims = document.getElementById('previewDims');
+  const previewDims     = document.getElementById('previewDims');
   const statusIndicator = document.getElementById('statusIndicator');
-  const statusText = document.getElementById('statusText');
-  const htmlModal = document.getElementById('htmlModal');
-  const htmlCode = document.getElementById('htmlCode');
-  const closeModalBtn = document.getElementById('closeModalBtn');
-  const copyHtmlBtn = document.getElementById('copyHtmlBtn');
+  const statusText      = document.getElementById('statusText');
+  const htmlModal       = document.getElementById('htmlModal');
+  const htmlCode        = document.getElementById('htmlCode');
+  const closeModalBtn   = document.getElementById('closeModalBtn');
+  const copyHtmlBtn     = document.getElementById('copyHtmlBtn');
+  const searchInput     = document.getElementById('searchInput');
+  const searchCounter   = document.getElementById('searchCounter');
+  const prevMatchBtn    = document.getElementById('prevMatchBtn');
+  const nextMatchBtn    = document.getElementById('nextMatchBtn');
+  const previewScrollArea = document.getElementById('previewScrollArea');
 
-  let capturedHtml = null;
-  let isBusy = false;
+  let capturedHtml       = null;
+  let isBusy             = false;
+  let currentSpatialMap  = [];
+  let currentDimensions  = { width: 1, height: 1 };
+  let textLayerEl        = null;
+  let textNodeEls        = [];
+  let matchIndices       = [];
+  let currentMatchIdx    = -1;
+  let resizeObserver     = null;
 
   function setStatus(state, message) {
     statusIndicator.className = 'status-indicator ' + state;
@@ -28,51 +41,218 @@
     urlInput.disabled = busy;
   }
 
-  function showPreview(base64Data, dimensions) {
-    previewImage.src = 'data:image/png;base64,' + base64Data;
-    previewImage.classList.remove('hidden');
-    previewPlaceholder.classList.add('hidden');
-    previewDims.textContent = `${dimensions.width} × ${dimensions.height}px`;
-  }
-
   function getUrl() {
     const raw = urlInput.value.trim();
     if (!raw) return null;
-    if (!/^https?:\/\//i.test(raw)) {
-      return 'https://' + raw;
+    return /^https?:\/\//i.test(raw) ? raw : 'https://' + raw;
+  }
+
+  /* ── Text Layer ── */
+
+  function buildTextLayer(spatialMap, dimensions) {
+    if (textLayerEl) {
+      textLayerEl.remove();
+      textLayerEl = null;
     }
-    return raw;
+    textNodeEls = [];
+    if (!spatialMap || spatialMap.length === 0) return;
+
+    textLayerEl = document.createElement('div');
+    textLayerEl.className = 'text-layer';
+
+    const screenshotW = dimensions.width;
+
+    spatialMap.forEach((item) => {
+      const el = document.createElement('div');
+      el.className = 'text-node';
+      el.dataset.text = item.text.toLowerCase();
+      el.dataset.x = item.x;
+      el.dataset.y = item.y;
+      el.dataset.w = item.width;
+      el.dataset.h = item.height;
+      el.title = item.text;
+      positionTextNode(el, item, screenshotW);
+      textLayerEl.appendChild(el);
+      textNodeEls.push(el);
+    });
+
+    previewContainer.appendChild(textLayerEl);
+  }
+
+  function positionTextNode(el, item, screenshotW) {
+    const displayW = previewImage.clientWidth || previewImage.naturalWidth;
+    const scale = displayW / screenshotW;
+    el.style.left   = (item.x * scale) + 'px';
+    el.style.top    = (item.y * scale) + 'px';
+    el.style.width  = (item.width  * scale) + 'px';
+    el.style.height = (item.height * scale) + 'px';
+  }
+
+  function repositionAllNodes() {
+    if (!currentSpatialMap.length) return;
+    const screenshotW = currentDimensions.width;
+    currentSpatialMap.forEach((item, i) => {
+      const el = textNodeEls[i];
+      if (el) positionTextNode(el, item, screenshotW);
+    });
+  }
+
+  /* ── Preview Display ── */
+
+  function showPreview(base64Data, dimensions, spatialMap) {
+    currentDimensions = dimensions;
+    currentSpatialMap = spatialMap || [];
+
+    previewImage.src = 'data:image/png;base64,' + base64Data;
+    previewContainer.classList.remove('hidden');
+    previewPlaceholder.classList.add('hidden');
+    previewDims.textContent = `${dimensions.width} \u00d7 ${dimensions.height}px`;
+
+    searchInput.value = '';
+    resetSearch();
+
+    previewImage.onload = () => {
+      buildTextLayer(currentSpatialMap, currentDimensions);
+      if (resizeObserver) resizeObserver.disconnect();
+      resizeObserver = new ResizeObserver(() => repositionAllNodes());
+      resizeObserver.observe(previewImage);
+
+      searchInput.disabled = false;
+      updateSearchCounter(0, 0);
+    };
+  }
+
+  /* ── Search Engine ── */
+
+  function resetSearch() {
+    matchIndices = [];
+    currentMatchIdx = -1;
+    clearAllHighlights();
+    updateSearchCounter(0, 0);
+    prevMatchBtn.disabled = true;
+    nextMatchBtn.disabled = true;
+  }
+
+  function clearAllHighlights() {
+    textNodeEls.forEach((el) => {
+      el.classList.remove('highlight', 'highlight-current');
+    });
+  }
+
+  function runSearch(query) {
+    clearAllHighlights();
+    matchIndices = [];
+    currentMatchIdx = -1;
+
+    if (!query) {
+      updateSearchCounter(0, 0);
+      prevMatchBtn.disabled = true;
+      nextMatchBtn.disabled = true;
+      return;
+    }
+
+    const q = query.toLowerCase();
+    textNodeEls.forEach((el, idx) => {
+      if (el.dataset.text.includes(q)) {
+        el.classList.add('highlight');
+        matchIndices.push(idx);
+      }
+    });
+
+    const total = matchIndices.length;
+    if (total > 0) {
+      currentMatchIdx = 0;
+      activateMatch(currentMatchIdx);
+    }
+
+    updateSearchCounter(total > 0 ? 1 : 0, total);
+    prevMatchBtn.disabled = total === 0;
+    nextMatchBtn.disabled = total === 0;
+  }
+
+  function activateMatch(idx) {
+    textNodeEls.forEach((el) => el.classList.remove('highlight-current'));
+
+    const targetElIdx = matchIndices[idx];
+    if (targetElIdx === undefined) return;
+
+    const el = textNodeEls[targetElIdx];
+    el.classList.add('highlight-current');
+    updateSearchCounter(idx + 1, matchIndices.length);
+
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function updateSearchCounter(current, total) {
+    searchCounter.className = 'search-counter';
+    if (total === 0 && searchInput.value.trim()) {
+      searchCounter.textContent = 'No results';
+      searchCounter.classList.add('no-results');
+    } else if (total === 0) {
+      searchCounter.textContent = '0 results';
+    } else {
+      searchCounter.textContent = `${current} of ${total}`;
+      searchCounter.classList.add('has-results');
+    }
+  }
+
+  searchInput.addEventListener('input', () => {
+    runSearch(searchInput.value.trim());
+  });
+
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.shiftKey ? stepMatch(-1) : stepMatch(1);
+    }
+  });
+
+  nextMatchBtn.addEventListener('click', () => stepMatch(1));
+  prevMatchBtn.addEventListener('click', () => stepMatch(-1));
+
+  function stepMatch(dir) {
+    if (matchIndices.length === 0) return;
+    currentMatchIdx = (currentMatchIdx + dir + matchIndices.length) % matchIndices.length;
+    activateMatch(currentMatchIdx);
+  }
+
+  /* ── Capture Handlers ── */
+
+  async function sendCapture(action, url) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ action, url }, (res) => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else resolve(res);
+      });
+    });
+  }
+
+  function handleCaptureResponse(response, modeLabel) {
+    if (response.success) {
+      showPreview(response.screenshot, response.dimensions, response.spatialMap || []);
+      capturedHtml = response.html;
+      viewHtmlBtn.disabled = !capturedHtml;
+      const nodeCount = (response.spatialMap || []).length;
+      setStatus('success', `${modeLabel} — ${response.dimensions.width}\u00d7${response.dimensions.height}px · ${nodeCount} text nodes`);
+    } else {
+      setStatus('error', response.error || 'Capture failed.');
+    }
   }
 
   captureBtn.addEventListener('click', async () => {
     if (isBusy) return;
     const url = getUrl();
-    if (!url) {
-      setStatus('error', 'Please enter a URL first.');
-      return;
-    }
+    if (!url) { setStatus('error', 'Please enter a URL first.'); return; }
     urlInput.value = url;
     setBusy(true);
     setStatus('loading', 'Opening tab and loading page…');
     viewHtmlBtn.disabled = true;
+    searchInput.disabled = true;
     capturedHtml = null;
+    resetSearch();
 
     try {
-      const response = await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ action: 'capture', url }, (res) => {
-          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-          else resolve(res);
-        });
-      });
-
-      if (response.success) {
-        showPreview(response.screenshot, response.dimensions);
-        capturedHtml = response.html;
-        viewHtmlBtn.disabled = !capturedHtml;
-        setStatus('success', `Captured ${response.dimensions.width}×${response.dimensions.height}px`);
-      } else {
-        setStatus('error', response.error || 'Capture failed.');
-      }
+      const response = await sendCapture('capture', url);
+      handleCaptureResponse(response, 'Captured');
     } catch (err) {
       setStatus('error', err.message || 'Unknown error.');
     } finally {
@@ -83,32 +263,18 @@
   findCaptureBtn.addEventListener('click', async () => {
     if (isBusy) return;
     const url = getUrl();
-    if (!url) {
-      setStatus('error', 'Please enter a URL first.');
-      return;
-    }
+    if (!url) { setStatus('error', 'Please enter a URL first.'); return; }
     urlInput.value = url;
     setBusy(true);
     setStatus('loading', 'Searching for open tab…');
     viewHtmlBtn.disabled = true;
+    searchInput.disabled = true;
     capturedHtml = null;
+    resetSearch();
 
     try {
-      const response = await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ action: 'find_and_capture', url }, (res) => {
-          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-          else resolve(res);
-        });
-      });
-
-      if (response.success) {
-        showPreview(response.screenshot, response.dimensions);
-        capturedHtml = response.html;
-        viewHtmlBtn.disabled = !capturedHtml;
-        setStatus('success', `Captured from existing tab — ${response.dimensions.width}×${response.dimensions.height}px`);
-      } else {
-        setStatus('error', response.error || 'Capture failed.');
-      }
+      const response = await sendCapture('find_and_capture', url);
+      handleCaptureResponse(response, 'Found & captured');
     } catch (err) {
       setStatus('error', err.message || 'Unknown error.');
     } finally {
@@ -116,20 +282,18 @@
     }
   });
 
+  /* ── HTML Viewer Modal ── */
+
   viewHtmlBtn.addEventListener('click', () => {
     if (!capturedHtml) return;
     htmlCode.textContent = formatHtml(capturedHtml);
     htmlModal.classList.remove('hidden');
   });
 
-  closeModalBtn.addEventListener('click', () => {
-    htmlModal.classList.add('hidden');
-  });
+  closeModalBtn.addEventListener('click', () => htmlModal.classList.add('hidden'));
 
   htmlModal.addEventListener('click', (e) => {
-    if (e.target === htmlModal) {
-      htmlModal.classList.add('hidden');
-    }
+    if (e.target === htmlModal) htmlModal.classList.add('hidden');
   });
 
   copyHtmlBtn.addEventListener('click', async () => {
@@ -137,37 +301,33 @@
     try {
       await navigator.clipboard.writeText(capturedHtml);
       copyHtmlBtn.textContent = 'Copied!';
-      setTimeout(() => { copyHtmlBtn.textContent = 'Copy'; }, 2000);
     } catch (e) {
       copyHtmlBtn.textContent = 'Failed';
-      setTimeout(() => { copyHtmlBtn.textContent = 'Copy'; }, 2000);
     }
+    setTimeout(() => { copyHtmlBtn.textContent = 'Copy'; }, 2000);
   });
 
+  /* ── Keyboard Shortcuts ── */
+
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      htmlModal.classList.add('hidden');
-    }
-    if ((e.key === 'Enter') && (e.ctrlKey || e.metaKey)) {
-      captureBtn.click();
-    }
+    if (e.key === 'Escape') htmlModal.classList.add('hidden');
+    if ((e.key === 'Enter') && (e.ctrlKey || e.metaKey)) captureBtn.click();
   });
+
+  /* ── HTML Formatter ── */
 
   function formatHtml(html) {
     let indent = 0;
-    const lines = html
-      .replace(/>\s*</g, '>\n<')
-      .split('\n');
-
+    const lines = html.replace(/>\s*</g, '>\n<').split('\n');
     return lines.map((line) => {
       line = line.trim();
       if (!line) return '';
-
       if (/^<\//.test(line)) indent = Math.max(0, indent - 1);
       const result = '  '.repeat(indent) + line;
-      if (/^<[^/!][^>]*[^/]>$/.test(line) && !/^<(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)/i.test(line)) {
-        indent++;
-      }
+      if (
+        /^<[^/!][^>]*[^/]>$/.test(line) &&
+        !/^<(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)/i.test(line)
+      ) indent++;
       return result;
     }).filter(Boolean).join('\n');
   }

@@ -128,13 +128,49 @@ html, body {
   line-height: 1.6;
 }
 
+.preview-container {
+  position: relative;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
 .preview-image {
   width: 100%;
   height: auto;
   display: block;
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow);
-  border: 1px solid var(--border);
+}
+
+.text-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.text-node {
+  position: absolute;
+  color: transparent;
+  user-select: text;
+  pointer-events: auto;
+  cursor: text;
+  border-radius: 2px;
+  transition: background-color 0.1s;
+}
+
+.text-node.highlight {
+  background-color: rgba(255, 220, 0, 0.38);
+  border: 1px solid rgba(255, 165, 0, 0.7);
+}
+
+.text-node.highlight-current {
+  background-color: rgba(255, 140, 0, 0.55);
+  border: 1px solid rgba(255, 90, 0, 0.9);
+  box-shadow: 0 0 0 2px rgba(255, 140, 0, 0.3);
 }
 
 /* ── Controls Panel (Right) ── */
@@ -331,6 +367,85 @@ html, body {
   flex: 1;
   min-width: 0;
   word-break: break-word;
+}
+
+/* ── Search Section ── */
+.search-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0 14px;
+}
+
+.search-input-wrap {
+  position: relative;
+}
+
+.search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  color: var(--text-muted);
+  pointer-events: none;
+  line-height: 1;
+}
+
+.search-input {
+  padding-left: 32px;
+}
+
+.search-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.search-counter {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.search-counter.has-results {
+  color: var(--success);
+}
+
+.search-counter.no-results {
+  color: var(--error);
+}
+
+.search-nav {
+  display: flex;
+  gap: 4px;
+}
+
+.search-nav-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-surface3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  line-height: 1;
+}
+
+.search-nav-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.search-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 /* ── Controls Footer ── */

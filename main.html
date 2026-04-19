@@ -20,7 +20,9 @@
           <div class="placeholder-icon">&#128247;</div>
           <p>Capture a page to see the preview here</p>
         </div>
-        <img class="preview-image hidden" id="previewImage" alt="Page Screenshot" />
+        <div class="preview-container hidden" id="previewContainer">
+          <img class="preview-image" id="previewImage" alt="Page Screenshot" />
+        </div>
       </div>
     </div>
 
@@ -64,6 +66,30 @@
         <div class="status-box" id="statusBox">
           <div class="status-indicator" id="statusIndicator"></div>
           <span class="status-text" id="statusText">Ready</span>
+        </div>
+
+        <div class="search-section" id="searchSection">
+          <div class="search-divider"></div>
+          <label class="input-label" for="searchInput">Search</label>
+          <div class="search-input-wrap">
+            <span class="search-icon">&#128269;</span>
+            <input
+              type="text"
+              id="searchInput"
+              class="url-input search-input"
+              placeholder="Search text in screenshot…"
+              autocomplete="off"
+              spellcheck="false"
+              disabled
+            />
+          </div>
+          <div class="search-controls">
+            <span class="search-counter" id="searchCounter">0 results</span>
+            <div class="search-nav">
+              <button class="search-nav-btn" id="prevMatchBtn" disabled title="Previous match">&#8593;</button>
+              <button class="search-nav-btn" id="nextMatchBtn" disabled title="Next match">&#8595;</button>
+            </div>
+          </div>
         </div>
       </div>
 

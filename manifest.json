@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Carousel Agent",
+  "version": "1.0.0",
+  "description": "Full-page screenshot capture with HTML viewer for any website.",
+  "permissions": [
+    "debugger",
+    "tabs",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Carousel Agent"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

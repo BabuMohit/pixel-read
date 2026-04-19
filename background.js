@@ -145,12 +145,15 @@ async function captureFullPage(tabId) {
             const parent = node.parentElement;
             const rect = parent.getBoundingClientRect();
             if (rect.width === 0 || rect.height === 0) continue;
+            const cs = window.getComputedStyle(parent);
             map.push({
               text: text,
               x: Math.round(rect.left + window.scrollX),
               y: Math.round(rect.top + window.scrollY),
               width: Math.round(rect.width),
-              height: Math.round(rect.height)
+              height: Math.round(rect.height),
+              fontSize: parseFloat(cs.fontSize) || 16,
+              fontFamily: cs.fontFamily || 'sans-serif'
             });
           }
           return JSON.stringify({ spatialMap: map, devicePixelRatio: window.devicePixelRatio });

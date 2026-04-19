@@ -1,33 +1,37 @@
 (() => {
-  const urlInput        = document.getElementById('urlInput');
-  const captureBtn      = document.getElementById('captureBtn');
-  const findCaptureBtn  = document.getElementById('findCaptureBtn');
-  const viewHtmlBtn     = document.getElementById('viewHtmlBtn');
-  const previewImage    = document.getElementById('previewImage');
-  const previewContainer = document.getElementById('previewContainer');
+  const urlInput           = document.getElementById('urlInput');
+  const captureBtn         = document.getElementById('captureBtn');
+  const findCaptureBtn     = document.getElementById('findCaptureBtn');
+  const viewHtmlBtn        = document.getElementById('viewHtmlBtn');
+  const previewImage       = document.getElementById('previewImage');
+  const previewContainer   = document.getElementById('previewContainer');
   const previewPlaceholder = document.getElementById('previewPlaceholder');
-  const previewDims     = document.getElementById('previewDims');
-  const statusIndicator = document.getElementById('statusIndicator');
-  const statusText      = document.getElementById('statusText');
-  const htmlModal       = document.getElementById('htmlModal');
-  const htmlCode        = document.getElementById('htmlCode');
-  const closeModalBtn   = document.getElementById('closeModalBtn');
-  const copyHtmlBtn     = document.getElementById('copyHtmlBtn');
-  const searchInput     = document.getElementById('searchInput');
-  const searchCounter   = document.getElementById('searchCounter');
-  const prevMatchBtn    = document.getElementById('prevMatchBtn');
-  const nextMatchBtn    = document.getElementById('nextMatchBtn');
-  const previewScrollArea = document.getElementById('previewScrollArea');
+  const previewDims        = document.getElementById('previewDims');
+  const statusIndicator    = document.getElementById('statusIndicator');
+  const statusText         = document.getElementById('statusText');
+  const htmlModal          = document.getElementById('htmlModal');
+  const htmlCode           = document.getElementById('htmlCode');
+  const closeModalBtn      = document.getElementById('closeModalBtn');
+  const copyHtmlBtn        = document.getElementById('copyHtmlBtn');
+  const searchInput        = document.getElementById('searchInput');
+  const searchCounter      = document.getElementById('searchCounter');
+  const prevMatchBtn       = document.getElementById('prevMatchBtn');
+  const nextMatchBtn       = document.getElementById('nextMatchBtn');
 
   let capturedHtml       = null;
   let isBusy             = false;
   let currentSpatialMap  = [];
   let currentDimensions  = { width: 1, height: 1 };
-  let textLayerEl        = null;
+
+  let textLayerEl        = null;   // z-index 2 — ghost text, selectable
+  let highlightLayerEl   = null;   // z-index 3 — search highlight boxes
   let textNodeEls        = [];
+  let highlightEls       = [];
   let matchIndices       = [];
   let currentMatchIdx    = -1;
   let resizeObserver     = null;
+
+  /* ── Helpers ── */
 
   function setStatus(state, message) {
     statusIndicator.className = 'status-indicator ' + state;
@@ -47,53 +51,80 @@
     return /^https?:\/\//i.test(raw) ? raw : 'https://' + raw;
   }
 
-  /* ── Text Layer ── */
+  /* ── Scale calculation ── */
 
-  function buildTextLayer(spatialMap, dimensions) {
-    if (textLayerEl) {
-      textLayerEl.remove();
-      textLayerEl = null;
-    }
-    textNodeEls = [];
-    if (!spatialMap || spatialMap.length === 0) return;
-
-    textLayerEl = document.createElement('div');
-    textLayerEl.className = 'text-layer';
-
-    const screenshotW = dimensions.width;
-
-    spatialMap.forEach((item) => {
-      const el = document.createElement('div');
-      el.className = 'text-node';
-      el.dataset.text = item.text.toLowerCase();
-      el.dataset.x = item.x;
-      el.dataset.y = item.y;
-      el.dataset.w = item.width;
-      el.dataset.h = item.height;
-      el.title = item.text;
-      positionTextNode(el, item, screenshotW);
-      textLayerEl.appendChild(el);
-      textNodeEls.push(el);
-    });
-
-    previewContainer.appendChild(textLayerEl);
+  function getScale(screenshotW) {
+    const displayW = previewImage.clientWidth || previewImage.naturalWidth || screenshotW;
+    return displayW / screenshotW;
   }
 
-  function positionTextNode(el, item, screenshotW) {
-    const displayW = previewImage.clientWidth || previewImage.naturalWidth;
-    const scale = displayW / screenshotW;
+  /* ── Positioning ── */
+
+  function applyPosition(el, item, scale) {
     el.style.left   = (item.x * scale) + 'px';
     el.style.top    = (item.y * scale) + 'px';
     el.style.width  = (item.width  * scale) + 'px';
     el.style.height = (item.height * scale) + 'px';
   }
 
+  function applyTextStyle(el, item, scale) {
+    const fs = (item.fontSize || 16) * scale;
+    el.style.fontSize   = fs + 'px';
+    el.style.fontFamily = item.fontFamily || 'sans-serif';
+  }
+
+  /* ── Build Layers ── */
+
+  function buildLayers(spatialMap, dimensions) {
+    if (textLayerEl)      { textLayerEl.remove();      textLayerEl = null; }
+    if (highlightLayerEl) { highlightLayerEl.remove(); highlightLayerEl = null; }
+    textNodeEls  = [];
+    highlightEls = [];
+
+    if (!spatialMap || spatialMap.length === 0) return;
+
+    const screenshotW = dimensions.width;
+    const scale = getScale(screenshotW);
+
+    textLayerEl      = document.createElement('div');
+    textLayerEl.className = 'text-layer';
+
+    highlightLayerEl = document.createElement('div');
+    highlightLayerEl.className = 'highlight-layer';
+
+    spatialMap.forEach((item) => {
+      /* Ghost text node — selectable, transparent */
+      const textEl = document.createElement('div');
+      textEl.className = 'text-node';
+      textEl.textContent = item.text;
+      textEl.dataset.text = item.text.toLowerCase();
+      textEl.title = item.text;
+      applyPosition(textEl, item, scale);
+      applyTextStyle(textEl, item, scale);
+      textLayerEl.appendChild(textEl);
+      textNodeEls.push(textEl);
+
+      /* Highlight box — visual only, pointer-events: none via layer */
+      const hlEl = document.createElement('div');
+      hlEl.className = 'highlight-box';
+      applyPosition(hlEl, item, scale);
+      highlightLayerEl.appendChild(hlEl);
+      highlightEls.push(hlEl);
+    });
+
+    previewContainer.appendChild(textLayerEl);
+    previewContainer.appendChild(highlightLayerEl);
+  }
+
   function repositionAllNodes() {
     if (!currentSpatialMap.length) return;
-    const screenshotW = currentDimensions.width;
+    const scale = getScale(currentDimensions.width);
     currentSpatialMap.forEach((item, i) => {
-      const el = textNodeEls[i];
-      if (el) positionTextNode(el, item, screenshotW);
+      if (textNodeEls[i])  {
+        applyPosition(textNodeEls[i], item, scale);
+        applyTextStyle(textNodeEls[i], item, scale);
+      }
+      if (highlightEls[i]) applyPosition(highlightEls[i], item, scale);
     });
   }
 
@@ -112,7 +143,8 @@
     resetSearch();
 
     previewImage.onload = () => {
-      buildTextLayer(currentSpatialMap, currentDimensions);
+      buildLayers(currentSpatialMap, currentDimensions);
+
       if (resizeObserver) resizeObserver.disconnect();
       resizeObserver = new ResizeObserver(() => repositionAllNodes());
       resizeObserver.observe(previewImage);
@@ -125,7 +157,7 @@
   /* ── Search Engine ── */
 
   function resetSearch() {
-    matchIndices = [];
+    matchIndices    = [];
     currentMatchIdx = -1;
     clearAllHighlights();
     updateSearchCounter(0, 0);
@@ -134,14 +166,14 @@
   }
 
   function clearAllHighlights() {
-    textNodeEls.forEach((el) => {
-      el.classList.remove('highlight', 'highlight-current');
+    highlightEls.forEach((el) => {
+      el.className = 'highlight-box';
     });
   }
 
   function runSearch(query) {
     clearAllHighlights();
-    matchIndices = [];
+    matchIndices    = [];
     currentMatchIdx = -1;
 
     if (!query) {
@@ -152,9 +184,9 @@
     }
 
     const q = query.toLowerCase();
-    textNodeEls.forEach((el, idx) => {
-      if (el.dataset.text.includes(q)) {
-        el.classList.add('highlight');
+    textNodeEls.forEach((textEl, idx) => {
+      if (textEl.dataset.text.includes(q)) {
+        highlightEls[idx].className = 'highlight-box match';
         matchIndices.push(idx);
       }
     });
@@ -171,16 +203,16 @@
   }
 
   function activateMatch(idx) {
-    textNodeEls.forEach((el) => el.classList.remove('highlight-current'));
+    highlightEls.forEach((el) => el.classList.remove('match-current'));
 
-    const targetElIdx = matchIndices[idx];
-    if (targetElIdx === undefined) return;
+    const targetIdx = matchIndices[idx];
+    if (targetIdx === undefined) return;
 
-    const el = textNodeEls[targetElIdx];
-    el.classList.add('highlight-current');
+    const hlEl = highlightEls[targetIdx];
+    hlEl.classList.add('match-current');
     updateSearchCounter(idx + 1, matchIndices.length);
 
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    hlEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   function updateSearchCounter(current, total) {
@@ -196,14 +228,10 @@
     }
   }
 
-  searchInput.addEventListener('input', () => {
-    runSearch(searchInput.value.trim());
-  });
+  searchInput.addEventListener('input', () => runSearch(searchInput.value.trim()));
 
   searchInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.shiftKey ? stepMatch(-1) : stepMatch(1);
-    }
+    if (e.key === 'Enter') e.shiftKey ? stepMatch(-1) : stepMatch(1);
   });
 
   nextMatchBtn.addEventListener('click', () => stepMatch(1));
@@ -249,10 +277,8 @@
     searchInput.disabled = true;
     capturedHtml = null;
     resetSearch();
-
     try {
-      const response = await sendCapture('capture', url);
-      handleCaptureResponse(response, 'Captured');
+      handleCaptureResponse(await sendCapture('capture', url), 'Captured');
     } catch (err) {
       setStatus('error', err.message || 'Unknown error.');
     } finally {
@@ -271,10 +297,8 @@
     searchInput.disabled = true;
     capturedHtml = null;
     resetSearch();
-
     try {
-      const response = await sendCapture('find_and_capture', url);
-      handleCaptureResponse(response, 'Found & captured');
+      handleCaptureResponse(await sendCapture('find_and_capture', url), 'Found & captured');
     } catch (err) {
       setStatus('error', err.message || 'Unknown error.');
     } finally {

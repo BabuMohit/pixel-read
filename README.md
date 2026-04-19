@@ -8,12 +8,14 @@ A powerful Chrome extension for capturing full-page screenshots and extracting H
 - **Dual Capture Modes**:
   - **Capture Mode**: Opens URL in a background tab, captures, and auto-closes
   - **Find & Capture Mode**: Captures from an already-open tab without creating duplicates
-- **Text Search & Highlighting**: 🆕 Search for text within captured screenshots with visual highlighting
+- **OCR-Like Text Extraction**: 🆕 Extracts text with font information for accurate rendering
+- **Dual-Layer Architecture**: 🆕 Separate layers for selectable text and visual highlights
+- **Text Search & Highlighting**: Search for text within captured screenshots with visual highlighting
   - Real-time search with instant highlighting
   - Navigate between matches with keyboard shortcuts (Enter/Shift+Enter) or navigation buttons
   - Visual indicators showing current match and total results
   - Smooth scrolling to highlighted matches
-- **Spatial Text Mapping**: 🆕 Extracts text positions from captured pages for accurate search
+- **Spatial Text Mapping**: Extracts text positions from captured pages for accurate search
 - **HTML Source Viewer**: View and copy the complete HTML source code of captured pages
 - **Split-Screen Interface**: 
   - Left panel: Scrollable screenshot preview with interactive text layer
@@ -21,11 +23,28 @@ A powerful Chrome extension for capturing full-page screenshots and extracting H
 - **Dark Theme**: Modern, eye-friendly dark interface
 - **Smart Focus Management**: Automatically returns focus to the extension tab after capture
 
-## 🆕 What's New in v3
+## 🆕 What's New in v4
 
-### UI/UX Improvements
-- **Interactive Text Hover**: 🆕 Text nodes now show a subtle blue highlight on hover for better interactivity
-- **Improved Z-Index Layering**: Enhanced visual hierarchy for text overlays (normal → highlighted → current match)
+### OCR-Like Text Rendering
+- **Font Information Extraction**: 🆕 Now captures fontSize and fontFamily from computed styles
+- **Accurate Text Rendering**: Text overlay matches original page typography
+- **Dual-Layer System**: 
+  - **Text Layer (z-index 2)**: Transparent, selectable text nodes with proper font styling
+  - **Highlight Layer (z-index 3)**: Visual-only highlight boxes for search results
+- **Improved Text Selection**: Text nodes are now fully selectable with proper font rendering
+- **Better Visual Hierarchy**: Cleaner separation between text content and search highlights
+
+### Technical Improvements
+- **Enhanced Spatial Extraction**: Now captures font metrics (fontSize, fontFamily) alongside position data
+- **Dynamic Font Scaling**: Text scales proportionally with screenshot resize
+- **Optimized Layer Management**: Separate layers prevent z-index conflicts
+- **Improved Performance**: Highlight boxes only render when matches are found
+
+### Previous Updates (v3)
+
+#### UI/UX Improvements
+- **Interactive Text Hover**: Text nodes show a subtle blue highlight on hover for better interactivity
+- **Improved Z-Index Layering**: Enhanced visual hierarchy for text overlays
 - **Smoother Transitions**: Refined hover animations with faster transition timing (0.12s)
 
 ### Previous Updates (v2)
@@ -39,10 +58,10 @@ A powerful Chrome extension for capturing full-page screenshots and extracting H
 - **Responsive Overlay**: Text layer automatically repositions on window resize
 
 #### Technical Improvements
-- **Enhanced Capture Engine**: Now extracts spatial coordinates for all visible text nodes
+- **Enhanced Capture Engine**: Extracts spatial coordinates for all visible text nodes
 - **TreeWalker Implementation**: Efficient DOM traversal filtering out hidden and non-visible elements
 - **ResizeObserver Integration**: Maintains accurate text positioning during window resizing
-- **Improved Status Messages**: Now shows text node count in capture status
+- **Improved Status Messages**: Shows text node count in capture status
 
 ## 🛠️ Technical Details
 
@@ -50,16 +69,19 @@ A powerful Chrome extension for capturing full-page screenshots and extracting H
 
 - **Manifest Version**: 3 (latest Chrome extension standard)
 - **Capture Engine**: Chrome Debugger API with `Page.captureScreenshot`
-- **Text Extraction**: DOM TreeWalker with getBoundingClientRect for spatial mapping
+- **Text Extraction**: DOM TreeWalker with getBoundingClientRect + getComputedStyle for spatial and font mapping
+- **Dual-Layer System**: 
+  - Text layer for selectable content (z-index 2)
+  - Highlight layer for visual feedback (z-index 3)
 - **Service Worker**: Background script for tab management and capture orchestration
-- **UI**: Dedicated extension tab with real-time status updates and interactive text layer
+- **UI**: Dedicated extension tab with real-time status updates and interactive text layers
 
 ### Permissions Required
 
 - `debugger` - Required for full-page screenshot capture via Chrome Debugger API
 - `tabs` - Tab creation and management
 - `activeTab` - Interaction with active tabs
-- `scripting` - JavaScript evaluation in tab context for text extraction
+- `scripting` - JavaScript evaluation in tab context for text and font extraction
 - `<all_urls>` - Allows debugger attachment to any website
 
 ## 📦 Installation
@@ -94,7 +116,7 @@ A powerful Chrome extension for capturing full-page screenshots and extracting H
    - **Capture**: Opens the URL in a new background tab, captures it, and closes the tab
    - **Find & Capture**: Searches for an already-open tab with that URL and captures it
 
-4. **View the screenshot** in the left preview panel
+4. **View the screenshot** in the left preview panel with selectable text overlay
 
 ### Text Search
 
@@ -111,6 +133,14 @@ A powerful Chrome extension for capturing full-page screenshots and extracting H
 
 5. **Result counter** shows your position (e.g., "2 of 5" or "No results")
 
+### Text Selection
+
+1. **Hover over text** in the screenshot to see interactive feedback
+
+2. **Click and drag** to select text from the captured page
+
+3. **Copy selected text** using standard keyboard shortcuts (Ctrl+C / Cmd+C)
+
 ### HTML Viewer
 
 1. **Click "View HTML"** to see the page's source code in a modal
@@ -123,10 +153,10 @@ A powerful Chrome extension for capturing full-page screenshots and extracting H
 
 ```
 ├── manifest.json       # Extension manifest (Manifest V3)
-├── background.js       # Service worker: capture engine, text extraction & tab management
+├── background.js       # Service worker: capture engine, font extraction & tab management
 ├── main.html          # Extension UI layout with search controls
-├── main.js            # Frontend logic: capture, search, text layer, preview
-├── main.css           # Dark-themed styles with text highlighting
+├── main.js            # Frontend logic: dual-layer system, search, text rendering
+├── main.css           # Dark-themed styles with dual-layer architecture
 ├── icons/             # Extension icons (16×48×128px)
 │   ├── icon16.png
 │   ├── icon48.png
@@ -144,15 +174,17 @@ A powerful Chrome extension for capturing full-page screenshots and extracting H
 4. **Screenshot Capture**: Uses `Page.captureScreenshot` with `captureBeyondViewport: true`
 5. **HTML Extraction**: Evaluates `document.documentElement.outerHTML` to get source code
 
-### Text Extraction & Search
+### OCR-Like Text Extraction
 
 1. **DOM Traversal**: Uses TreeWalker to iterate through all text nodes in the page
 2. **Visibility Filtering**: Excludes hidden elements, scripts, styles, and zero-size elements
-3. **Spatial Mapping**: Captures bounding rectangles (x, y, width, height) for each text node
-4. **Text Layer Rendering**: Creates an invisible overlay with positioned divs matching text locations
+3. **Spatial & Font Mapping**: Captures bounding rectangles (x, y, width, height) and computed styles (fontSize, fontFamily)
+4. **Dual-Layer Rendering**: 
+   - **Text Layer**: Creates transparent text divs with proper font styling for selection
+   - **Highlight Layer**: Creates visual-only highlight boxes for search feedback
 5. **Search Matching**: Performs case-insensitive substring matching on text content
-6. **Visual Highlighting**: Applies CSS classes to matching text nodes for visual feedback
-7. **Responsive Positioning**: Uses ResizeObserver to maintain accuracy during window resizing
+6. **Visual Highlighting**: Applies CSS classes to highlight boxes for visual feedback
+7. **Responsive Positioning**: Uses ResizeObserver to maintain accuracy during window resizing with dynamic font scaling
 
 ## ⚠️ Known Limitations
 
@@ -160,8 +192,9 @@ A powerful Chrome extension for capturing full-page screenshots and extracting H
 - Cannot capture Chrome internal pages (e.g., `chrome://`, `chrome-extension://`)
 - Some websites with strict CSP policies may block debugger attachment
 - Screenshots are captured at device scale factor 1 (no high-DPI scaling)
-- Text search matches are based on parent element boundaries, not individual words
+- Text rendering approximates original layout but may not be pixel-perfect
 - Very long pages with thousands of text nodes may experience slight performance impact
+- Font rendering depends on system-installed fonts matching the original page
 
 ## 🤝 Contributing
 
@@ -176,15 +209,17 @@ This project is open source and available for personal and educational use.
 
 ## 🔮 Future Enhancements
 
-- OCR support for text in images
+- True OCR support for text in images
+- Advanced font matching and fallback system
 - Multiple screenshot format support (JPEG, WebP)
 - Batch URL capture
 - Screenshot annotation tools
-- Export to PDF
+- Export to PDF with selectable text
 - Custom viewport dimensions
 - Screenshot history
-- Advanced search (regex, case-sensitive)
-- Text selection and copying from screenshots
+- Advanced search (regex, case-sensitive, whole word)
+- Text highlighting and note-taking
+- Multi-language text extraction
 
 ---
 

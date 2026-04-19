@@ -21,9 +21,16 @@ A powerful Chrome extension for capturing full-page screenshots and extracting H
 - **Dark Theme**: Modern, eye-friendly dark interface
 - **Smart Focus Management**: Automatically returns focus to the extension tab after capture
 
-## 🆕 What's New in v2
+## 🆕 What's New in v3
 
-### Text Search & Highlighting
+### UI/UX Improvements
+- **Interactive Text Hover**: 🆕 Text nodes now show a subtle blue highlight on hover for better interactivity
+- **Improved Z-Index Layering**: Enhanced visual hierarchy for text overlays (normal → highlighted → current match)
+- **Smoother Transitions**: Refined hover animations with faster transition timing (0.12s)
+
+### Previous Updates (v2)
+
+#### Text Search & Highlighting
 - **Spatial Text Extraction**: Automatically extracts text positions from captured pages using DOM traversal
 - **Interactive Search**: Search for any text within the screenshot and see it highlighted in real-time
 - **Match Navigation**: Navigate between search results with up/down arrows or Enter/Shift+Enter
@@ -31,7 +38,7 @@ A powerful Chrome extension for capturing full-page screenshots and extracting H
 - **Result Counter**: Shows "X of Y" results or "No results" for empty searches
 - **Responsive Overlay**: Text layer automatically repositions on window resize
 
-### Technical Improvements
+#### Technical Improvements
 - **Enhanced Capture Engine**: Now extracts spatial coordinates for all visible text nodes
 - **TreeWalker Implementation**: Efficient DOM traversal filtering out hidden and non-visible elements
 - **ResizeObserver Integration**: Maintains accurate text positioning during window resizing

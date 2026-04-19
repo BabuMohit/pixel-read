@@ -159,18 +159,25 @@ html, body {
   pointer-events: auto;
   cursor: text;
   border-radius: 2px;
-  transition: background-color 0.1s;
+  transition: background-color 0.12s;
+  z-index: 0;
+}
+
+.text-node:hover {
+  background-color: rgba(0, 123, 255, 0.05);
 }
 
 .text-node.highlight {
   background-color: rgba(255, 220, 0, 0.38);
   border: 1px solid rgba(255, 165, 0, 0.7);
+  z-index: 1;
 }
 
 .text-node.highlight-current {
   background-color: rgba(255, 140, 0, 0.55);
   border: 1px solid rgba(255, 90, 0, 0.9);
   box-shadow: 0 0 0 2px rgba(255, 140, 0, 0.3);
+  z-index: 2;
 }
 
 /* ── Controls Panel (Right) ── */

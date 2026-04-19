@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Carousel Agent",
+  "name": "Pixel Read",
   "version": "1.0.0",
   "description": "Full-page screenshot capture with HTML viewer for any website.",
   "permissions": [
@@ -16,7 +16,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "Carousel Agent"
+    "default_title": "Pixel Read"
   },
   "icons": {
     "16": "icons/icon16.png",
